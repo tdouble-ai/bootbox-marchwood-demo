@@ -1240,6 +1240,7 @@ let semanticMatchIds=new Set();
 let semanticForQuery=null;
 let semanticDebounce=null;
 
+let expandDebounce=null;
 searchInput.addEventListener("input",()=>{
   semanticMatchIds=new Set();
   semanticForQuery=null;
@@ -1247,13 +1248,22 @@ searchInput.addEventListener("input",()=>{
   searchStatus.classList.remove("err");
   applyVisibility();
   clearTimeout(semanticDebounce);
+  clearTimeout(expandDebounce);
   const q=searchInput.value.trim();
   if(q.length<2) return;
-  autoExpandMatchingDatabases(q.toLowerCase());
-  applyVisibility();
-  const keywordHits=NODES.filter(n=>!hiddenSections.has(n.section) && nodeSearchText(n).includes(q.toLowerCase())).length;
-  if(keywordHits>0) return;
-  semanticDebounce=setTimeout(()=>runSemanticSearch(q), 600);
+  // Only probe collapsed databases' row-level content once typing settles (not on every
+  // keystroke) -- otherwise a short mid-word substring like "st" matches almost everything
+  // and cascades an expand of every database before the full word is even typed.
+  const keywordHitsNow=NODES.filter(n=>!hiddenSections.has(n.section) && nodeSearchText(n).includes(q.toLowerCase())).length;
+  if(keywordHitsNow>0) return;
+  expandDebounce=setTimeout(()=>{
+    if(searchInput.value.trim()!==q) return;
+    autoExpandMatchingDatabases(q.toLowerCase());
+    applyVisibility();
+    const keywordHits=NODES.filter(n=>!hiddenSections.has(n.section) && nodeSearchText(n).includes(q.toLowerCase())).length;
+    if(keywordHits>0) return;
+    semanticDebounce=setTimeout(()=>runSemanticSearch(q), 250);
+  }, 300);
 });
 
 async function runSemanticSearch(q){
