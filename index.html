@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bootbox — Ledger Graph (Marchwood, public demo)</title>
+<style>
+  :root{
+    color-scheme: light;
+    --amber:#c84f09;
+    --lime:#7e8c14;
+    --dark:#1a140d;
+    --kraft:#cdb389;
+    --paper:#efe4c9;
+    --panel:#efe4c9;
+    --panel-edge:#b89a6c;
+    --text:#241b10;
+    --muted:#6b5636;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --serif:'DM Serif Display',Georgia,'Times New Roman',serif;
+    --sans:'Barlow',system-ui,-apple-system,Segoe UI,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--kraft);
+    background-image:repeating-linear-gradient(180deg, rgba(0,0,0,0.02) 0 2px, transparent 2px 22px);
+    color:var(--text);
+    font-family:var(--sans);
+    overflow:hidden;
+  }
+  #app{position:fixed;inset:0;}
+  svg{display:block;width:100%;height:100%;cursor:grab;user-select:none;}
+  svg.grabbing{cursor:grabbing;}
+
+  /* Header */
+  #header{
+    position:absolute;top:0;left:0;right:0;
+    padding:18px 22px 14px;pointer-events:none;z-index:5;
+    background:linear-gradient(180deg, rgba(205,179,137,0.96) 0%, rgba(205,179,137,0) 100%);
+  }
+  #header h1{
+    font-family:var(--serif);font-style:italic;font-weight:400;
+    font-size:26px;letter-spacing:.2px;color:var(--text);line-height:1;
+  }
+  #header h1 .accent{color:var(--amber);}
+  #header .sub{
+    font-family:var(--mono);font-size:11px;letter-spacing:1.5px;
+    text-transform:uppercase;color:var(--muted);margin-top:6px;
+  }
+  #header .synced{
+    font-family:var(--mono);font-size:10px;letter-spacing:.5px;
+    color:var(--lime);margin-top:4px;opacity:.85;
+  }
+
+  /* Controls */
+  #controls{
+    position:absolute;top:84px;left:22px;z-index:6;
+    display:flex;flex-direction:column;gap:12px;
+    width:min(300px, calc(100vw - 44px));
+    max-height:calc(100% - 110px);overflow-y:auto;overflow-x:hidden;
+  }
+  #search{
+    width:100%;background:var(--panel);border:1px solid var(--panel-edge);
+    color:var(--text);font-family:var(--mono);font-size:12px;
+    padding:9px 12px;border-radius:6px;outline:none;
+  }
+  #search:focus{border-color:var(--amber);}
+  #search::placeholder{color:var(--muted);}
+  #search-status{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.3px;color:var(--lime);
+    min-height:12px;padding:0 2px;
+  }
+  #search-status.err{color:#c85040;}
+  #legend, #predicate-legend, #csi-note{
+    display:flex;flex-direction:column;gap:5px;background:var(--panel);
+    border:1px solid var(--panel-edge);border-radius:8px;padding:10px;
+  }
+  .legend-title{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;
+    text-transform:uppercase;color:var(--muted);margin-bottom:3px;
+  }
+  .filter-btn{
+    display:flex;align-items:center;gap:8px;background:none;border:none;
+    color:var(--text);font-family:var(--mono);font-size:11px;
+    padding:4px 5px;border-radius:5px;cursor:pointer;text-align:left;width:100%;
+    transition:background .12s,opacity .12s;
+  }
+  .filter-btn:hover{background:rgba(0,0,0,0.06);}
+  .filter-btn.off{opacity:.32;}
+  .filter-btn .swatch{width:11px;height:11px;border-radius:3px;flex:0 0 auto;}
+  .filter-btn .count{margin-left:auto;color:var(--muted);font-size:9.5px;}
+  #reset-btn,#grid-btn,#about-btn{
+    background:var(--panel);border:1px solid var(--panel-edge);color:var(--muted);
+    font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    padding:7px 10px;border-radius:6px;cursor:pointer;
+  }
+  #reset-btn:hover,#grid-btn:hover,#about-btn:hover{color:var(--text);border-color:var(--amber);}
+  #grid-btn.active{color:var(--dark);border-color:var(--lime);background:var(--lime);}
+  #about-btn{color:var(--amber);border-color:var(--amber);}
+
+  /* About modal */
+  #about-overlay{
+    position:absolute;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
+    background:rgba(11,10,8,0.55);
+  }
+  #about-overlay.hidden{display:none;}
+  #about-modal{
+    position:relative;width:min(520px, calc(100vw - 48px));max-height:calc(100% - 60px);
+    overflow-y:auto;background:var(--panel);border:1px solid var(--panel-edge);border-radius:10px;
+    padding:28px 26px;box-shadow:0 12px 40px rgba(0,0,0,0.35);
+  }
+  #about-modal h3{
+    font-family:var(--serif);font-style:italic;font-weight:400;font-size:21px;
+    color:var(--text);margin-bottom:14px;
+  }
+  #about-modal h3 .accent{color:var(--amber);}
+  #about-modal p{
+    font-size:13.5px;line-height:1.65;color:var(--text);margin-bottom:14px;
+  }
+  #about-modal p:last-of-type{margin-bottom:0;}
+  #about-modal .kw{font-family:var(--mono);font-size:12px;background:rgba(0,0,0,0.06);padding:1px 5px;border-radius:3px;}
+  #about-close{
+    position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);
+    font-size:22px;cursor:pointer;line-height:1;
+  }
+  #about-close:hover{color:var(--amber);}
+  .pred-row{display:flex;flex-direction:column;gap:2px;padding:5px 2px;border-bottom:1px solid rgba(0,0,0,0.06);}
+  .pred-row:last-child{border-bottom:none;}
+  .pred-row .pred-line{display:flex;align-items:center;gap:8px;}
+  .pred-row svg{flex:0 0 auto;width:34px;height:10px;}
+  .pred-row .ptitle{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--text);white-space:nowrap;}
+  .pred-row .pex{font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-left:42px;line-height:1.4;}
+  #csi-note{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.5;}
+  #csi-note b{color:var(--text);}
+
+  /* Side panel */
+  #panel{
+    position:absolute;top:0;right:0;bottom:0;width:360px;background:var(--panel);
+    border-left:1px solid var(--panel-edge);padding:26px 24px;
+    transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+    z-index:7;overflow-y:auto;
+  }
+  #panel.open{transform:translateX(0);}
+  #panel .ptag{
+    display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:1.2px;
+    text-transform:uppercase;padding:4px 9px;border-radius:4px;color:var(--dark);
+    font-weight:600;margin-bottom:10px;margin-right:6px;
+  }
+  #panel .potype{
+    display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:1px;
+    text-transform:uppercase;padding:4px 9px;border-radius:4px;color:var(--muted);
+    border:1px solid var(--panel-edge);margin-bottom:10px;
+  }
+  #panel h2{font-family:var(--serif);font-weight:400;font-size:22px;line-height:1.18;margin-bottom:4px;}
+  #panel .pkind{font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;color:var(--muted);margin-bottom:14px;}
+  #panel .pmeta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+  #panel .pmeta .chip{
+    font-family:var(--mono);font-size:10px;letter-spacing:.3px;background:rgba(0,0,0,0.05);
+    border:1px solid var(--panel-edge);border-radius:4px;padding:4px 8px;color:var(--text);
+  }
+  #panel .pmeta .chip.status-approved{color:#3f6b1f;border-color:#7e8c14;background:rgba(126,140,20,0.12);}
+  #panel .pmeta .chip.status-probation{color:#8a6a10;border-color:#c9a227;background:rgba(201,162,39,0.14);}
+  #panel .pmeta .chip.status-avoid{color:#a3372c;border-color:#c85040;background:rgba(200,80,64,0.12);}
+  #panel .pnote{font-size:12.5px;color:var(--text);opacity:.85;line-height:1.55;margin-bottom:14px;}
+  #panel .popen{
+    display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.5px;
+    color:var(--lime);text-decoration:none;border:1px solid var(--panel-edge);
+    padding:6px 11px;border-radius:6px;margin-top:4px;
+  }
+  #panel .popen:hover{border-color:var(--lime);}
+  #panel button.popen{background:none;cursor:pointer;margin-left:6px;}
+  #panel button.popen:disabled{opacity:.5;cursor:default;border-color:var(--panel-edge);}
+  #panel .conn-title{
+    font-family:var(--mono);font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--muted);margin:22px 0 9px;padding-top:16px;border-top:1px solid var(--panel-edge);
+  }
+  #panel .conn{
+    display:flex;align-items:center;gap:7px;font-size:12.5px;padding:6px 0;cursor:pointer;
+    border-bottom:1px solid rgba(0,0,0,0.07);
+  }
+  #panel .conn:hover{color:var(--lime);}
+  #panel .conn .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  #panel .conn .pred{font-family:var(--mono);font-size:9.5px;color:var(--muted);white-space:nowrap;}
+  #panel .conn .dir{font-family:var(--mono);font-size:10px;color:var(--muted);}
+  #panel-close{
+    position:absolute;top:16px;right:18px;background:none;border:none;color:var(--muted);
+    font-size:22px;cursor:pointer;line-height:1;
+  }
+  #panel-close:hover{color:var(--amber);}
+
+  /* graph elements */
+  line.link{stroke:#8a6536;stroke-opacity:.5;stroke-width:1px;}
+  line.link.hl{stroke:var(--amber) !important;stroke-opacity:.95 !important;stroke-dasharray:none !important;stroke-width:2px !important;}
+  g.node .note{
+    cursor:pointer;stroke:var(--dark);stroke-width:1px;
+    filter:url(#paper);
+    transform-box:fill-box;transform-origin:center;
+    transform:rotate(var(--tilt,0deg));
+    transition:transform .18s ease, filter .18s ease;
+    animation:notein .5s ease backwards;
+  }
+  g.node:hover .note{transform:rotate(var(--tilt,0deg)) scale(1.18);}
+  g.node.lift .note{transform:rotate(var(--tilt,0deg)) scale(1.32);}
+  @keyframes notein{
+    from{opacity:0;transform:rotate(var(--tilt,0deg)) translateY(-10px) scale(.5);}
+    to{opacity:1;transform:rotate(var(--tilt,0deg)) scale(1);}
+  }
+  g.node text{
+    font-family:var(--mono);fill:var(--text);pointer-events:none;
+    paint-order:stroke;stroke:var(--kraft);stroke-width:3.5px;stroke-linejoin:round;
+  }
+  g.node.dim{opacity:.12;}
+  .hidden{display:none !important;}
+
+  #hint{
+    position:absolute;bottom:14px;left:22px;z-index:5;font-family:var(--mono);
+    font-size:10px;letter-spacing:.5px;color:var(--muted);pointer-events:none;max-width:640px;line-height:1.6;
+  }
+  #footer-credit{
+    position:absolute;bottom:14px;right:22px;z-index:5;font-family:var(--mono);
+    font-size:10px;letter-spacing:.5px;color:var(--muted);pointer-events:none;
+    background:var(--panel);border:1px solid var(--panel-edge);border-radius:6px;
+    padding:6px 10px;opacity:.9;
+  }
+
+  /* loading / error overlay */
+  #overlay{
+    position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:18px;background:var(--kraft);text-align:center;padding:30px;
+  }
+  #overlay.gone{display:none;}
+  .spinner{
+    width:46px;height:46px;border:3px solid var(--panel-edge);border-top-color:var(--amber);
+    border-radius:50%;animation:spin .9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #ov-msg{font-family:var(--mono);font-size:12px;letter-spacing:.5px;color:var(--muted);max-width:440px;line-height:1.6;}
+  #ov-msg .big{display:block;font-family:var(--serif);font-style:italic;font-size:22px;color:var(--text);margin-bottom:8px;}
+  #ov-sub{font-family:var(--mono);font-size:10.5px;color:var(--lime);}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>Bootbox <span class="accent">Ledger</span></h1>
+    <div class="sub">Marchwood demo · static snapshot · cardboard · full front-matter</div>
+    <div class="synced" id="synced"></div>
+  </div>
+
+  <div id="controls" class="hidden">
+    <input id="search" type="text" placeholder="search names, notes, trades, status…" autocomplete="off">
+    <div id="search-status"></div>
+    <div id="legend">
+      <div class="legend-title">Envelopes — click to toggle</div>
+      <div id="filters"></div>
+    </div>
+    <div id="predicate-legend">
+      <div class="legend-title">relates_to — front-matter</div>
+      <div id="pred-rows"></div>
+    </div>
+    <div id="csi-note">
+      <b>◆ diamond</b> = CSI division (type: Taxonomy)<br>
+      <b>⬭ rounded</b> = organization (owner / sub / supplier)<br>
+      <b>▢ square</b> = record (project, cost item, lesson…)
+    </div>
+    <button id="grid-btn">⊞ Family grid</button>
+    <button id="reset-btn">Reset view (collapse all)</button>
+    <button id="about-btn">ⓘ About this demo</button>
+  </div>
+
+  <div id="about-overlay" class="hidden">
+    <div id="about-modal">
+      <button id="about-close">&times;</button>
+      <h3>About this <span class="accent">demo</span></h3>
+      <p>Search here runs on keywords and metadata, not meaning — type <span class="kw">steel</span> and you'll find it, type <span class="kw">structural material</span> and you won't. This demo is about showing the file structure and visibility: how the data connects, not full search. Semantic search is part of the real engagement build, not this public snapshot. There's also a new Family Grid view — same data, sorted into groups instead of floating free, if the web gets busy.</p>
+      <p>Bootbox is my business-context layer, built for TDoubleAI clients. This public version is a snapshot so anyone can click through without an account. For actual clients it runs live — linked straight to Notion or whatever secure system already holds your data.</p>
+    </div>
+  </div>
+
+  <div id="panel">
+    <button id="panel-close">&times;</button>
+    <span class="ptag" id="p-tag"></span>
+    <span class="potype" id="p-otype"></span>
+    <h2 id="p-name"></h2>
+    <div class="pkind" id="p-kind"></div>
+    <div class="pmeta" id="p-meta"></div>
+    <div class="pnote" id="p-note"></div>
+    <a class="popen" id="p-open" target="_blank" rel="noopener">Open in Notion ↗</a>
+    <button class="popen" id="p-expand">⤢ Expand</button>
+    <div class="conn-title" id="p-conn-title">relates_to</div>
+    <div id="p-conns"></div>
+  </div>
+
+  <div id="hint" class="hidden">click node → details + Expand · drag · scroll = zoom · shape = type (◆ CSI division / ⬭ org / ▢ record) · line style = relates_to, see legend · ⊞ Family grid groups everything by envelope</div>
+  <div id="footer-credit">built by TDoubleAI · tdoubleai.ca</div>
+
+  <div id="overlay">
+    <div class="spinner"></div>
+    <div id="ov-msg"><span class="big">Opening the box…</span>Reading Marchwood's ledger, a fictional demo company.</div>
+    <div id="ov-sub"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ================= CONFIG =================
+const HUB_ID = "3776a49b8ecf8189a9c5d765f209eca1"; // Marchwood Construction (Demo)
+const SNAPSHOT_DATE = "2026-07-06";
+
+// ---- Sections (visual domain / color) ----
+const SECTIONS = {
+  business:  {label:"Business Context",           color:"#c84f09"},
+  cost:      {label:"Cost / Estimating",           color:"#e0a72e"},
+  projects:  {label:"Projects",                    color:"#ff5e3a"},
+  pipeline:  {label:"Bid Pipeline",                color:"#5cc36e"},
+  orgs:      {label:"Organizations (owners/subs)", color:"#3fb6c4"},
+  lessons:   {label:"Lessons Learned",             color:"#9b7ede"},
+  contract:  {label:"Contract Positions",          color:"#d6555f"},
+  sops:      {label:"SOPs & Templates",            color:"#b4d200"},
+  taxonomy:  {label:"CSI Division",                color:"#5c5040"}
+};
+
+// ---- front-matter "type" values (node classes) and how they render ----
+// rx = corner radius (shape signal): 2 = square record, 10 = rounded org, 3+tilt45 = diamond taxonomy
+const OTYPE_STYLE = {
+  Hub:          {rx:2,  tilt:"random"},
+  Document:     {rx:2,  tilt:"random"},
+  CaseStudy:    {rx:2,  tilt:"random"},
+  Taxonomy:     {rx:3,  tilt:"fixed45"},
+  Organization: {rx:10, tilt:"random"},
+  Project:      {rx:2,  tilt:"random"},
+  Opportunity:  {rx:2,  tilt:"random"},
+  CostItem:     {rx:2,  tilt:"random"},
+  Lesson:       {rx:2,  tilt:"random"}
+};
+
+// ---- Relationship predicates (controlled vocabulary) grouped into 5 visual families ----
+const GROUPS = {
+  structural: {title:"Structural",     example:"partOf, references",         color:"#8a6536", dash:"none",   width:1},
+  taxonomy:   {title:"Classification", example:"CSI division",               color:"#3fb6c4", dash:"2 3",    width:1.3},
+  commercial: {title:"Commercial",     example:"owns, supplies, pursues",    color:"#9b7ede", dash:"6 3 1 3",width:1.3},
+  evidence:   {title:"Evidence",       example:"lesson, case study",         color:"#c84f09", dash:"none",   width:1.8},
+  governance: {title:"Governance",     example:"contract, SOP",              color:"#6b5636", dash:"3 3",    width:1.2}
+};
+const PREDICATES = {
+  partOf:            {label:"partOf",            group:"structural"},
+  references:        {label:"references",        group:"structural"},
+  relatedDoc:         {label:"relatedDoc",         group:"structural"},
+  classifiedUnder:    {label:"classifiedUnder",    group:"taxonomy"},
+  leadDivision:       {label:"leadDivision",       group:"taxonomy"},
+  ownedBy:            {label:"ownedBy",            group:"commercial"},
+  suppliedBy:         {label:"suppliedBy",         group:"commercial"},
+  pursues:            {label:"pursues",            group:"commercial"},
+  generatedLesson:    {label:"generatedLesson",    group:"evidence"},
+  documentsLesson:    {label:"documentsLesson",    group:"evidence"},
+  informsRate:        {label:"informsRate",        group:"evidence"},
+  relatesToProject:   {label:"relatesToProject",   group:"evidence"},
+  impactsDivision:    {label:"impactsDivision",    group:"evidence"},
+  recordedIn:         {label:"recordedIn",         group:"evidence"},
+  governedByClause:   {label:"governedByClause",   group:"governance"},
+  definesClause:      {label:"definesClause",      group:"governance"},
+  definesProcedure:   {label:"definesProcedure",   group:"governance"},
+  appliesTo:          {label:"appliesTo",          group:"governance"},
+  referencesRate:     {label:"referencesRate",     group:"governance"},
+  tracks:             {label:"tracks",             group:"governance"}
+};
+
+// ---- CSI MasterFormat divisions actually referenced by this dataset ----
+const DIVISIONS = {
+  general:    {code:"01", label:"General Requirements"},
+  concrete:   {code:"03", label:"Concrete"},
+  masonry:    {code:"04", label:"Masonry"},
+  metals:     {code:"05", label:"Metals / Structural Steel"},
+  thermal:    {code:"07", label:"Thermal & Moisture (Roofing)"},
+  openings:   {code:"08", label:"Openings (Glazing)"},
+  finishes:   {code:"09", label:"Finishes (Painting)"},
+  fire:       {code:"21", label:"Fire Suppression"},
+  mechanical: {code:"23", label:"HVAC / Mechanical"},
+  electrical: {code:"26", label:"Electrical"},
+  earthwork:  {code:"31", label:"Earthwork (Civil/Excavation)"},
+  exterior:   {code:"32", label:"Exterior Improvements (Landscaping)"}
+};
+const DIVISION_MATCH = [
+  ["structural steel","metals"], ["steel","metals"],
+  ["concrete supply","concrete"], ["concrete","concrete"],
+  ["masonry","masonry"],
+  ["roofing","thermal"],
+  ["glazing","openings"],
+  ["painting","finishes"], ["finishes","finishes"],
+  ["fire protection","fire"], ["fire","fire"],
+  ["mech equipment","mechanical"], ["mechanical","mechanical"],
+  ["electrical supply","electrical"], ["electrical","electrical"],
+  ["excavation","earthwork"], ["civil","earthwork"],
+  ["landscaping","exterior"],
+  ["general","general"]
+];
+function mapDivision(raw){
+  if(!raw) return null;
+  const t = String(raw).toLowerCase();
+  for(const [needle,bucket] of DIVISION_MATCH){ if(t.includes(needle)) return bucket; }
+  return null;
+}
+
+// ---- lesson title -> CSI divisions it exposed (hand-curated from the case study) ----
+const LESSON_DIVISION_HINTS = [
+  [/overlay mechanical and structural/i, ["metals","mechanical"]],
+  [/addendum-vs-base diff/i,             ["mechanical"]],
+  [/electrical\/grounding/i,             ["electrical"]],
+  [/geotech coverage/i,                  ["earthwork"]]
+];
+
+// ---- curated, TYPED cross-links among the top-level (unexpanded) hub spokes ----
+const MARCHWOOD_CURATED = [
+  ["business background","contract positions","definesClause"],
+  ["business background","sops","definesProcedure"],
+  ["business background","projects register","tracks"],
+  ["business background","bid pipeline","tracks"],
+  ["ashfield mills","lessons learned","documentsLesson"],
+  ["ashfield mills","cost history","informsRate"],
+  ["ashfield mills","projects register","recordedIn"],
+  ["ashfield mills","contract positions","governedByClause"],
+  ["sops","cost history","referencesRate"],
+  ["contract positions","bid pipeline","appliesTo"],
+  ["demo tour","ask-it-anything","relatedDoc"],
+  ["demo tour","ashfield mills","relatedDoc"]
+];
+
+// ================= STATIC SNAPSHOT DATA =================
+// Baked from a live read of Marchwood's Notion workspace on 2026-07-06.
+// This is a public, standalone demo — no live network calls, no Cowork bridge required.
+const STATIC_TOPLEVEL = [
+  {id:HUB_ID, name:"Marchwood Construction (Demo)", section:"business", otype:"Hub", kind:"Hub page", url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8189a9c5d765f209eca1", isHub:true},
+  {id:"3776a49b8ecf8104a869c16fad6b84bf", name:"Business Background", section:"business", otype:"Document", kind:"Page", url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8104a869c16fad6b84bf"},
+  {id:"3776a49b8ecf8138a551f89b75964178", name:"Contract Positions", section:"contract", otype:"Document", kind:"Page", url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8138a551f89b75964178"},
+  {id:"b58a317257644b358f6106c54236cf2c", name:"Cost History / Rate Library", section:"cost", otype:"Taxonomy", kind:"Database", url:"https://azure-bolt-fae.notion.site/b58a317257644b358f6106c54236cf2c"},
+  {id:"b0deafb36aa344f3b848b5bfcb0b58de", name:"Projects Register", section:"projects", otype:"Taxonomy", kind:"Database", url:"https://azure-bolt-fae.notion.site/b0deafb36aa344f3b848b5bfcb0b58de"},
+  {id:"9f91d77284ce47fa928956e9f6c7136b", name:"Lessons Learned", section:"lessons", otype:"Taxonomy", kind:"Database", url:"https://azure-bolt-fae.notion.site/9f91d77284ce47fa928956e9f6c7136b"},
+  {id:"824234a9bbf04d7ab77840c93744400f", name:"Subcontractor & Supplier Directory", section:"orgs", otype:"Taxonomy", kind:"Database", url:"https://azure-bolt-fae.notion.site/824234a9bbf04d7ab77840c93744400f"},
+  {id:"74a8e420f26e402aab19ce58a5a4e4fe", name:"Bid Pipeline", section:"pipeline", otype:"Taxonomy", kind:"Database", url:"https://azure-bolt-fae.notion.site/74a8e420f26e402aab19ce58a5a4e4fe"},
+  {id:"3776a49b8ecf810d85d9cb745f511914", name:"SOPs & Templates", section:"sops", otype:"Document", kind:"Page", url:"https://azure-bolt-fae.notion.site/3776a49b8ecf810d85d9cb745f511914"},
+  {id:"3776a49b8ecf810e988cf46d4b0fa42d", name:"Demo Tour — Start Here", section:"business", otype:"Document", kind:"Page", url:"https://azure-bolt-fae.notion.site/3776a49b8ecf810e988cf46d4b0fa42d"},
+  {id:"3776a49b8ecf813d8c54c3c412c735d4", name:"Ashfield Mills — Case Study", section:"projects", otype:"CaseStudy", kind:"Page", url:"https://azure-bolt-fae.notion.site/3776a49b8ecf813d8c54c3c412c735d4"},
+  {id:"3776a49b8ecf81f2b8a9ccb90c679b45", name:"Ask-It-Anything — The Curated Set Answering", section:"business", otype:"Document", kind:"Page", url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81f2b8a9ccb90c679b45"}
+];
+
+const STATIC_ROWS = {
+  cost: [
+    {Item:"CMU block 200mm",Division:"Masonry",Low:185,Typical:220,High:265,Unit:"m²",Basis:"Institutional",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81058c54dbc5d23e1e69"},
+    {Item:"Slab on grade 150mm",Division:"Concrete",Low:95,Typical:115,High:140,Unit:"m²",Basis:"Last 3 jobs",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8131bfb5e04483d1dac6"},
+    {Item:"LED high-bay fixture",Division:"Electrical",Low:420,Typical:560,High:740,Unit:"each",Basis:"Supply + install",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf813b9dc2ca31256f0f8d"},
+    {Item:"Ductwork — galvanized",Division:"Mechanical",Low:14,Typical:18,High:24,Unit:"kg",Basis:"Field average",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf813d8b20c61c7bacc644"},
+    {Item:"Structural steel erected",Division:"Steel",Low:4200,Typical:4900,High:5800,Unit:"tonne",Basis:"Supply + erect",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8155b2b3e8d4e71bfd31"},
+    {Item:"RTU install (incl. curb)",Division:"Mechanical",Low:9500,Typical:13500,High:19000,Unit:"each",Basis:"Varies by tonnage",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf815693dec7a9ef50acd0"},
+    {Item:"Footings — supply & place",Division:"Concrete",Low:380,Typical:430,High:500,Unit:"m³",Basis:"Last 3 jobs",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf816cbd5fc5dbb65a8d29"},
+    {Item:"Branch wiring per device",Division:"Electrical",Low:95,Typical:135,High:185,Unit:"each",Basis:"Field average",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8196ae19c8377cdd1a82"},
+    {Item:"Copper DWV / water rough-in",Division:"Mechanical",Low:850,Typical:1150,High:1600,Unit:"fixture",Basis:"Plumbing",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf819881edee0a87741cbb"},
+    {Item:"Pool tank wall (formed, reinforced)",Division:"Concrete",Low:420,Typical:520,High:640,Unit:"m²",Basis:"Aquatic projects only",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81a09dc5f413a5f57452"},
+    {Item:"Panelboard install",Division:"Electrical",Low:2800,Typical:3900,High:5400,Unit:"each",Basis:"Varies by size",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81d9bffdd81159bfd555"}
+  ],
+  projects: [
+    {Project:"Westport Heritage School Renovation",Code:"MCG-2202",Status:"Complete","Contract Value":2600000,"Earned to Date":2600000,"Lead Division":"General",Owner:"Upper Canada DSB",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81149a24e8181ae7d1bb"},
+    {Project:"Perth Community Centre Renovation",Code:"MCG-2403",Status:"Active","Contract Value":8800000,"Earned to Date":3100000,"Lead Division":"Multi-discipline",Owner:"Town of Perth",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8116bb99db925f4a6fcf"},
+    {Project:"Kanata Office Complex Tenant Fitout",Code:"MCG-2304",Status:"Complete","Contract Value":4400000,"Earned to Date":4400000,"Lead Division":"Multi-discipline",Owner:"Kanata Office Complex Inc.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf811e92efe3eacc8b5a80"},
+    {Project:"Ashfield Mills Rec & Aquatic Centre",Code:"MCG-2401",Status:"Active","Contract Value":31500000,"Earned to Date":14900000,"Lead Division":"Multi-discipline",Owner:"Town of Ashfield Mills",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf812f9dbae3c00e6d74f0"},
+    {Project:"Pembroke OPP Detachment",Code:"MCG-2407",Status:"Active","Contract Value":9600000,"Earned to Date":3900000,"Lead Division":"Multi-discipline",Owner:"OPP / Province of Ontario",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf813dbb27ef4ad4870ba3"},
+    {Project:"Almonte Industrial Park Servicing",Code:"MCG-2404",Status:"Active","Contract Value":4200000,"Earned to Date":2800000,"Lead Division":"Civil",Owner:"Town of Mississippi Mills",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf814f83efd6a1971edaf4"},
+    {Project:"Kemptville Long-Term Care Ph2",Code:"MCG-2301",Status:"Complete","Contract Value":18400000,"Earned to Date":18400000,"Lead Division":"Multi-discipline",Owner:"Rideau Care Group",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8155aa8de7fb5d7e99cd"},
+    {Project:"Smiths Falls Water Treatment Upgrade",Code:"MCG-2402",Status:"Active","Contract Value":12900000,"Earned to Date":7200000,"Lead Division":"Multi-discipline",Owner:"Town of Smiths Falls",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8162b8d5f09b86926024"},
+    {Project:"Renfrew Water Booster Station",Code:"MCG-2506",Status:"Active","Contract Value":5700000,"Earned to Date":1800000,"Lead Division":"Civil",Owner:"County of Renfrew",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8172af81c54b1dde1edd"},
+    {Project:"Lanark Highlands Curling Club",Code:"MCG-2302",Status:"Complete","Contract Value":3100000,"Earned to Date":3100000,"Lead Division":"Multi-discipline",Owner:"Township of Lanark Highlands",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8184bc60d4bc58482c47"},
+    {Project:"Brockville Hospital Lab Fitout",Code:"MCG-2406",Status:"Active","Contract Value":3800000,"Earned to Date":1400000,"Lead Division":"Mechanical",Owner:"Brockville General Hospital",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81e8bc7cc311f6defd92"},
+    {Project:"Carleton Place Library",Code:"MCG-2501",Status:"Complete","Contract Value":6300000,"Earned to Date":6300000,"Lead Division":"Multi-discipline",Owner:"Town of Carleton Place",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81f9b166f4b6ab3aa75b"}
+  ],
+  bids: [
+    {Opportunity:"Renfrew County Long-Term Care","Owner / Client":"County of Renfrew","Estimated Value":22000000,Stage:"Proposal",Probability:0.55,"Next Action":"Develop pre-construction proposal with phasing strategy",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf810bbb7df6579ee89c7e"},
+    {Opportunity:"Kemptville Family Health Centre","Owner / Client":"Rideau Care Group","Estimated Value":9200000,Stage:"Identified",Probability:0.45,"Next Action":"Site walk + concept proposal",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf810fbc21d28fbbaa462b"},
+    {Opportunity:"Pembroke Wastewater Treatment Upgrade","Owner / Client":"Town of Pembroke","Estimated Value":14500000,Stage:"Bidding",Probability:0.35,"Next Action":"Mechanical takeoff + treatment process pricing",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81d2a852cb3908202929"},
+    {Opportunity:"Almonte Riverwalk Servicing Ph2","Owner / Client":"Town of Mississippi Mills","Estimated Value":4600000,Stage:"Negotiating",Probability:0.8,"Next Action":"Schedule and execution plan to client this week",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81d3a8eee433251b275a"},
+    {Opportunity:"Lanark Highlands Arena Renewal","Owner / Client":"Township of Lanark Highlands","Estimated Value":7800000,Stage:"Identified",Probability:0.25,"Next Action":"Monitor RFP release; intro meeting with Township CAO",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81fc88f2c689334fa542"}
+  ],
+  subs: [
+    {Company:"Driftwood Glazing",Type:"Subcontractor",Trade:"Glazing",Status:"Approved",Bondable:"__YES__","WSIB Current":"__YES__","Performance Notes":"Curtain wall + storefront. Good for institutional. Lead time can stretch.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8101aae6e22e29c1e354"},
+    {Company:"Bedrock Excavation & Grading",Type:"Subcontractor",Trade:"Excavation",Status:"Approved",Bondable:"__YES__","WSIB Current":"__YES__","Performance Notes":"Self-mobilized; equipment fleet strong. Used on Almonte Industrial.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf811698e7c1dd64e1716f"},
+    {Company:"Cavendish Ready-Mix Inc.",Type:"Supplier",Trade:"Concrete Supply",Status:"Approved",Bondable:"__NO__","WSIB Current":"__YES__","Performance Notes":"Reliable supplier across last 3 yrs. Plant in Carleton Place.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81198ba8cf3794957bbd"},
+    {Company:"Cedarline Landscape Group",Type:"Subcontractor",Trade:"Landscaping",Status:"Approved",Bondable:"__YES__","WSIB Current":"__YES__","Performance Notes":"Repeat partner. Strong on hardscape and large institutional sites.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf812086d5c19b1fb36739"},
+    {Company:"Birdshot Painting Co.",Type:"Subcontractor",Trade:"Painting",Status:"Avoid",Bondable:"__NO__","WSIB Current":"__YES__","Performance Notes":"Multiple call-backs on Lanark Curling Club. Quality variable. Recommend alternates.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf812fb623df3ae12aa890"},
+    {Company:"Apex Roofing & Sheet Metal",Type:"Subcontractor",Trade:"Roofing",Status:"Approved",Bondable:"__YES__","WSIB Current":"__YES__","Performance Notes":"Used on Carleton Place Library and Curling Club. On-time, on-budget.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8147a222dc0a2cfaf699"},
+    {Company:"Quintet Sprinkler Systems",Type:"Subcontractor",Trade:"Fire Protection",Status:"Approved",Bondable:"__YES__","WSIB Current":"__YES__","Performance Notes":"Reliable, ULC certified. Used on most aquatic/institutional.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81628ef1ef0045c6e2d1"},
+    {Company:"Highland Masonry Ltd.",Type:"Subcontractor",Trade:"Masonry",Status:"Probation",Bondable:"__YES__","WSIB Current":"__YES__","Performance Notes":"WSIB clearance lapsed mid-2025 — corrected. Watch at PO stage. Otherwise solid.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81758839e7223c6dc0ce"},
+    {Company:"Rideau Steel Erectors Ltd.",Type:"Subcontractor",Trade:"Structural Steel",Status:"Approved",Bondable:"__YES__","WSIB Current":"__YES__","Performance Notes":"Tier-1 sub. $1.95M Ashfield subcontract. Steel rework at F-7 absorbed by Marchwood (coordination miss, not theirs).",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf817eb8fdd535bf9630c2"},
+    {Company:"Lanark Electric Supply",Type:"Supplier",Trade:"Electrical Supply",Status:"Approved",Bondable:"__NO__","WSIB Current":"__YES__","Performance Notes":"Local distributor, good service. Used on every Eastern Ontario job.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81eaa74be087c3f4a9b1"},
+    {Company:"Tellfield Pool Systems",Type:"Supplier",Trade:"Mech Equipment",Status:"Approved",Bondable:"__NO__","WSIB Current":"__YES__","Performance Notes":"Specialty pool equipment (filters, dosing). Sole-source for some lines.",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81fab238eb006fe52751"}
+  ],
+  lessons: [
+    {Lesson:"Verify geotech coverage of every excavation scope before bid",Category:"Procurement",Project:"Ashfield Mills (MCG-2401)","What happened":"Rock encountered at SWM pond excavation. Geotech report didn't cover the pond footprint. Owner-paid as differing site condition.","What we do differently":"Pre-bid geotech-vs-site-footprint overlay. Carry contingency on any uncovered footprint.",Impact:"CO-003: $67,200",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf8132aec9f764c4a2c1a1"},
+    {Lesson:"Scan electrical/grounding specs for dimensioned references; flag undimensioned ones",Category:"Estimating",Project:"Ashfield Mills (MCG-2401)","What happened":"Pool bonding extent referenced in E-017, Spec 26 05 26, and deck plan P-002 — dimensioned in none. Addendum 3 set the 3.0 m perimeter.","What we do differently":"Scope-gap reconciliation pass for any safety- or code-driven dimension referenced in multiple documents.",Impact:"Carried as allowance — no surprise",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81768f34e7782cbfd68b"},
+    {Lesson:"Confirm sustainability/ESG scope explicitly before bid",Category:"Contract",Project:"Ashfield Mills (MCG-2401)","What happened":"EV charging rough-in excluded from base scope; owner added late as CO-001. Not a miss, but a habit-of-mind shift needed.","What we do differently":"Pre-bid checklist now includes EV, solar-ready, water reuse — explicit yes/no with owner.",Impact:"CO-001: $42,800 — owner add, not absorbed",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf819e9c70f4e35d7f4946"},
+    {Lesson:"Overlay mechanical and structural sheets at tender on any rooftop-MEP project",Category:"Coordination",Project:"Ashfield Mills (MCG-2401)","What happened":"MAU-1 pool dehumidification clearance overlapped roof beam B-F7 at grid F-7. Each sheet correct alone; never laid on top of each other at tender. Found in the field.","What we do differently":"Pre-bid: a mechanical-on-structural overlay pass on every tender with rooftop MEP. Flag clearance conflicts before pricing.",Impact:"$31,050 + 3 weeks (CO-002 + CO-004)",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81f28deaee4d0b6dbf5d"},
+    {Lesson:"Run an addendum-vs-base diff on every priced fact before number is committed",Category:"Estimating",Project:"Ashfield Mills (MCG-2401)","What happened":"Filter count: P&ID M-012 said 3, schedule M-014 said 2. Addendum 3 governs (3). Sharp estimator caught it; could have been missed.","What we do differently":"Reconciliation pass at bid close — every schedule line cross-checked against addenda and P&IDs. Flag undimensioned references.",Impact:"Would have under-bid one full filter vessel + install (~$22K)",url:"https://azure-bolt-fae.notion.site/3776a49b8ecf81fca928f1a4b31b5a7e"}
+  ]
+};
+
+// ================= helpers =================
+function norm(s){
+  if(!s) return "";
+  const m = String(s).match(/[0-9a-fA-F]{32}/g);
+  if(m && m.length) return m[m.length-1].toLowerCase();
+  return String(s).replace(/[^a-f0-9]/gi,"").toLowerCase();
+}
+function stripEmoji(s){
+  try{
+    return (s||"").replace(/^[\s\u{FE0F}\u{2190}-\u{2BFF}\p{Extended_Pictographic}]+/u,"").trim() || s;
+  }catch(_){
+    return (s||"").trim();
+  }
+}
+function slugify(s){ return "org:"+String(s).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""); }
+function money(n){ if(n==null||n==="") return ""; const num = Number(n); if(Number.isNaN(num)) return String(n); return "$"+Math.round(num).toLocaleString(); }
+
+function urlForId(id, fallback){ return fallback || ("https://www.notion.so/"+id); }
+function findNodeIn(arr, matcher){
+  const m = matcher.toLowerCase();
+  return arr.find(x=>x.name.toLowerCase()===m) || arr.find(x=>x.name.toLowerCase().includes(m)) || null;
+}
+function detectDbKind(name){
+  const t=(name||"").toLowerCase();
+  if(/cost history|rate library/.test(t)) return "cost";
+  if(/projects register/.test(t)) return "projects";
+  if(/bid pipeline/.test(t)) return "bids";
+  if(/subcontractor|supplier/.test(t)) return "subs";
+  if(/lessons learned/.test(t)) return "lessons";
+  return null;
+}
+
+// ================= LOAD DATA (static snapshot, no network) =================
+async function loadData(){
+  const nodes = new Map();
+  STATIC_TOPLEVEL.forEach(n=>nodes.set(n.id, Object.assign({}, n)));
+  const linksMap = new Map(); // key "a|b" sorted -> {source,target,predicate}
+  const addLink = (a,b,predicate)=>{
+    if(!a||!b||a===b) return;
+    const key=[a,b].sort().join("|");
+    if(!linksMap.has(key)) linksMap.set(key,{source:a,target:b,predicate:predicate||"references"});
+  };
+  STATIC_TOPLEVEL.forEach(n=>{ if(!n.isHub) addLink(HUB_ID, n.id, "partOf"); });
+
+  const nodeArr = [...nodes.values()];
+
+  // typed curated cross-links among top-level pages
+  let curatedCount = 0;
+  for(const [ma,mb,pred] of MARCHWOOD_CURATED){
+    const na = findNodeIn(nodeArr, ma), nb = findNodeIn(nodeArr, mb);
+    if(na && nb && na.id !== nb.id){
+      const key = [na.id,nb.id].sort().join("|");
+      if(!linksMap.has(key)){ linksMap.set(key,{source:na.id,target:nb.id,predicate:pred}); curatedCount++; }
+    }
+  }
+  const linkArr = [...linksMap.values()];
+  return {nodes:nodeArr, links:linkArr, curatedCount};
+}
+
+// ================= GRAPH (vanilla force sim + SVG) =================
+const SVGNS = "http://www.w3.org/2000/svg";
+let NODES=[], LINKS=[], nodeById={}, adj={};
+let W=window.innerWidth, H=window.innerHeight;
+let svg, root, linkLayer, nodeLayer;
+let view={x:0,y:0,k:1};
+let selected=null;
+
+function radius(d){ return 5 + Math.sqrt((d.deg||1))*4.2; }
+function restStroke(n){
+  n.circle.setAttribute("stroke", n.kind==="Database" ? "var(--muted)" : "var(--dark)");
+  n.circle.setAttribute("stroke-width", 1.5);
+}
+
+function computeGraph(){
+  const degree={}; NODES.forEach(n=>degree[n.id]=0);
+  adj={}; NODES.forEach(n=>adj[n.id]=new Set());
+  LINKS = LINKS.filter(l=>{
+    const keep = nodeById[l.source] && nodeById[l.target];
+    if(!keep && l.el) l.el.remove();
+    return keep;
+  });
+  const seen=new Set();
+  LINKS = LINKS.filter(l=>{
+    const k=[l.source,l.target].sort().join("|");
+    if(seen.has(k)){ if(l.el) l.el.remove(); return false; }
+    seen.add(k); return true;
+  });
+  LINKS.forEach(l=>{ degree[l.source]++; degree[l.target]++; adj[l.source].add(l.target); adj[l.target].add(l.source); });
+  NODES.forEach(n=>n.deg=degree[n.id]||0);
+}
+
+function styleForPredicate(pred){
+  const p = PREDICATES[pred] || PREDICATES.references;
+  return GROUPS[p.group] || GROUPS.structural;
+}
+function makeLinkEl(l){
+  const ln=document.createElementNS(SVGNS,"line");
+  ln.setAttribute("class","link");
+  const st = styleForPredicate(l.predicate);
+  ln.setAttribute("stroke", st.color);
+  ln.setAttribute("stroke-width", st.width);
+  ln.setAttribute("stroke-dasharray", st.dash);
+  ln.setAttribute("stroke-opacity", "0.55");
+  l.el=ln; linkLayer.appendChild(ln);
+}
+function noteSize(d){ return Math.round(radius(d)*1.7); }
+function makeNodeEl(n){
+  const g=document.createElementNS(SVGNS,"g");
+  g.setAttribute("class","node");
+  const style = OTYPE_STYLE[n.otype] || OTYPE_STYLE.Document;
+  if(n.tilt==null){
+    n.tilt = style.tilt==="fixed45" ? (45 + (Math.random()*6-3)) : (Math.random()*16 - 8);
+  }
+  const s=noteSize(n);
+  const c=document.createElementNS(SVGNS,"rect");
+  c.setAttribute("class","note");
+  c.setAttribute("width",s); c.setAttribute("height",s);
+  c.setAttribute("x",-s/2); c.setAttribute("y",-s/2);
+  c.setAttribute("rx", style.rx);
+  c.setAttribute("fill",(SECTIONS[n.section]||SECTIONS.business).color);
+  c.style.setProperty("--tilt", n.tilt.toFixed(2)+"deg");
+  c.style.animationDelay = (Math.random()*0.35).toFixed(2)+"s";
+  if(n.kind==="Database") c.setAttribute("stroke-dasharray","3 2");
+  g.appendChild(c);
+  const t=document.createElementNS(SVGNS,"text");
+  t.setAttribute("x", s/2+6); t.setAttribute("y",4);
+  t.setAttribute("font-size",n.deg>6?12:10.5);
+  t.textContent=n.name;
+  g.appendChild(t);
+  n.el=g; n.circle=c; n.label=t;
+  nodeLayer.appendChild(g);
+  attachNodeEvents(n);
+}
+function refreshSizes(){
+  NODES.forEach(n=>{ if(n.circle){ const s=noteSize(n); n.circle.setAttribute("width",s); n.circle.setAttribute("height",s); n.circle.setAttribute("x",-s/2); n.circle.setAttribute("y",-s/2); n.label.setAttribute("x",s/2+6); n.label.setAttribute("font-size",n.deg>6?12:10.5); } });
+}
+
+function buildGraph(data){
+  NODES = data.nodes;
+  LINKS = data.links;
+  nodeById = Object.fromEntries(NODES.map(n=>[n.id,n]));
+  computeGraph();
+
+  NODES.forEach((n,i)=>{
+    const a=(i/NODES.length)*Math.PI*2;
+    const rr=n.isHub?0:220+Math.random()*160;
+    n.x=W/2+Math.cos(a)*rr; n.y=H/2+Math.sin(a)*rr; n.vx=0; n.vy=0;
+  });
+
+  svg=document.createElementNS(SVGNS,"svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  document.getElementById("app").appendChild(svg);
+  root=document.createElementNS(SVGNS,"g"); svg.appendChild(root);
+  const defs=document.createElementNS(SVGNS,"defs");
+  const filt=document.createElementNS(SVGNS,"filter");
+  filt.setAttribute("id","paper"); filt.setAttribute("x","-40%"); filt.setAttribute("y","-40%"); filt.setAttribute("width","180%"); filt.setAttribute("height","180%");
+  const ds=document.createElementNS(SVGNS,"feDropShadow");
+  ds.setAttribute("dx","1.2"); ds.setAttribute("dy","2"); ds.setAttribute("stdDeviation","1.4"); ds.setAttribute("flood-color","#3a2a14"); ds.setAttribute("flood-opacity","0.3");
+  filt.appendChild(ds); defs.appendChild(filt); svg.appendChild(defs);
+  linkLayer=document.createElementNS(SVGNS,"g"); root.appendChild(linkLayer);
+  nodeLayer=document.createElementNS(SVGNS,"g"); root.appendChild(nodeLayer);
+
+  LINKS.forEach(makeLinkEl);
+  NODES.forEach(makeNodeEl);
+
+  initInteractions();
+  buildFilters();
+  buildPredicateLegend();
+  runSim();
+  applyTransform();
+}
+
+// ---- ownership tracking (which expand() calls "claim" a node, so collapse only removes orphans) ----
+const nodeOwners = {};
+function addOwner(id, ownerId){
+  if(!id || !ownerId) return;
+  if(!nodeOwners[id]) nodeOwners[id] = new Set();
+  nodeOwners[id].add(ownerId);
+}
+function removeOwner(id, ownerId){ if(nodeOwners[id]) nodeOwners[id].delete(ownerId); }
+function ownerCount(id){ return nodeOwners[id] ? nodeOwners[id].size : 0; }
+
+// ---- synthetic node helpers (Organization / CSI Division) ----
+function getOrCreateOrg(name, origin, newNodesArr, extraMeta, ownerId){
+  if(!name) return null;
+  const id = slugify(name);
+  if(nodeById[id]){ addOwner(id, ownerId); newNodesArr.push(nodeById[id]); return nodeById[id]; }
+  const n = {
+    id, name: String(name).trim(), section:"orgs", otype:"Organization", kind:"Organization",
+    url:null, meta: extraMeta||{},
+    x: origin ? origin.x+(Math.random()-0.5)*160 : W/2, y: origin ? origin.y+(Math.random()-0.5)*160 : H/2,
+    vx:0, vy:0
+  };
+  NODES.push(n); nodeById[id]=n; newNodesArr.push(n); addOwner(id, ownerId);
+  return n;
+}
+function getOrCreateDivision(bucket, origin, newNodesArr, ownerId){
+  if(!bucket || !DIVISIONS[bucket]) return null;
+  const id = "div:"+bucket;
+  if(nodeById[id]){ addOwner(id, ownerId); newNodesArr.push(nodeById[id]); return nodeById[id]; }
+  const d = DIVISIONS[bucket];
+  const n = {
+    id, name: d.code+" · "+d.label, section:"taxonomy", otype:"Taxonomy", kind:"CSI Division",
+    url:null, meta:{code:d.code},
+    x: origin ? origin.x+(Math.random()-0.5)*160 : W/2, y: origin ? origin.y+(Math.random()-0.5)*160 : H/2,
+    vx:0, vy:0
+  };
+  NODES.push(n); nodeById[id]=n; newNodesArr.push(n); addOwner(id, ownerId);
+  return n;
+}
+function findNodeByOtypeAndName(otypes, needle){
+  const t = needle.toLowerCase();
+  return NODES.find(n=>otypes.includes(n.otype) && n.name.toLowerCase().includes(t)) || null;
+}
+
+// ---- lazy expand-on-click (+ retract) — reads static per-database rows, no network ----
+async function expandNode(n, btn){
+  if(n.expanded){ collapseNode(n, btn); return; }
+  const orig = btn ? btn.textContent : "";
+  if(btn){ btn.textContent="Loading…"; btn.disabled=true; }
+  try{
+    const newNodes=[]; const newLinks=[];
+    if(n.kind==="Database"){
+      const kind2 = detectDbKind(n.name);
+      const rows = (STATIC_ROWS[kind2]||[]).slice();
+      if(kind2==="cost"){
+        rows.forEach(row=>{
+          const id = norm(row.url)||slugify(row.Item);
+          if(!row.Item || nodeById[id]) return;
+          const rec = {id, name:row.Item, section:"cost", otype:"CostItem", kind:"Record", url:row.url,
+            meta:{Division:row.Division, Low:money(row.Low), Typical:money(row.Typical), High:money(row.High), Unit:row.Unit, Basis:row.Basis}};
+          newNodes.push(rec); newLinks.push({source:n.id,target:id,predicate:"partOf"});
+          const bucket = mapDivision(row.Division);
+          const div = getOrCreateDivision(bucket, n, newNodes, n.id);
+          if(div) newLinks.push({source:id,target:div.id,predicate:"classifiedUnder"});
+        });
+      } else if(kind2==="projects"){
+        rows.forEach(row=>{
+          const id = norm(row.url)||slugify(row.Project);
+          if(!row.Project || nodeById[id]) return;
+          const rec = {id, name:row.Project, section:"projects", otype:"Project", kind:"Record", url:row.url,
+            meta:{Code:row.Code, Status:row.Status, Value:money(row["Contract Value"]), Earned:money(row["Earned to Date"]), LeadDivision:row["Lead Division"], Owner:row.Owner}};
+          newNodes.push(rec); newLinks.push({source:n.id,target:id,predicate:"partOf"});
+          const bucket = mapDivision(row["Lead Division"]);
+          const div = getOrCreateDivision(bucket, n, newNodes, n.id);
+          if(div) newLinks.push({source:id,target:div.id,predicate:"leadDivision"});
+          const org = getOrCreateOrg(row.Owner, n, newNodes, {role:"Owner / Client"}, n.id);
+          if(org) newLinks.push({source:id,target:org.id,predicate:"ownedBy"});
+          if(/ashfield mills/i.test(row.Project)){
+            const cs = findNodeByOtypeAndName(["CaseStudy"], "ashfield mills");
+            if(cs) newLinks.push({source:id,target:cs.id,predicate:"recordedIn"});
+          }
+        });
+      } else if(kind2==="bids"){
+        rows.forEach(row=>{
+          const id = norm(row.url)||slugify(row.Opportunity);
+          if(!row.Opportunity || nodeById[id]) return;
+          const prob = row.Probability!=null ? Math.round(row.Probability*100)+"%" : "";
+          const rec = {id, name:row.Opportunity, section:"pipeline", otype:"Opportunity", kind:"Record", url:row.url,
+            meta:{Stage:row.Stage, Value:money(row["Estimated Value"]), Probability:prob, Owner:row["Owner / Client"], NextAction:row["Next Action"]}};
+          newNodes.push(rec); newLinks.push({source:n.id,target:id,predicate:"partOf"});
+          const org = getOrCreateOrg(row["Owner / Client"], n, newNodes, {role:"Owner / Client"}, n.id);
+          if(org) newLinks.push({source:id,target:org.id,predicate:"pursues"});
+        });
+      } else if(kind2==="subs"){
+        rows.forEach(row=>{
+          const id = norm(row.url)||slugify(row.Company);
+          if(!row.Company || nodeById[id]) return;
+          const rec = {id, name:row.Company, section:"orgs", otype:"Organization", kind:"Record", url:row.url,
+            meta:{Type:row.Type, Trade:row.Trade, Status:row.Status, Bondable:row.Bondable==="__YES__"?"Yes":"No", WSIB:row["WSIB Current"]==="__YES__"?"Current":"Lapsed", Notes:row["Performance Notes"]}};
+          newNodes.push(rec); newLinks.push({source:n.id,target:id,predicate:"partOf"});
+          const bucket = mapDivision(row.Trade);
+          const div = getOrCreateDivision(bucket, n, newNodes, n.id);
+          if(div) newLinks.push({source:id,target:div.id,predicate:"classifiedUnder"});
+          if(row["Performance Notes"] && /ashfield/i.test(row["Performance Notes"])){
+            const cs = findNodeByOtypeAndName(["CaseStudy","Project"], "ashfield mills");
+            if(cs) newLinks.push({source:id,target:cs.id,predicate:"suppliedBy"});
+          }
+        });
+      } else if(kind2==="lessons"){
+        rows.forEach(row=>{
+          const id = norm(row.url)||slugify(row.Lesson);
+          if(!row.Lesson || nodeById[id]) return;
+          const rec = {id, name:row.Lesson, section:"lessons", otype:"Lesson", kind:"Record", url:row.url,
+            meta:{Category:row.Category, Project:row.Project, What:row["What happened"], Fix:row["What we do differently"], Impact:row.Impact}};
+          newNodes.push(rec); newLinks.push({source:n.id,target:id,predicate:"partOf"});
+          const proj = findNodeByOtypeAndName(["CaseStudy","Project"], "ashfield mills");
+          if(proj) newLinks.push({source:id,target:proj.id,predicate:"relatesToProject"});
+          for(const [re,buckets] of LESSON_DIVISION_HINTS){
+            if(re.test(row.Lesson)){
+              buckets.forEach(b=>{
+                const div = getOrCreateDivision(b, n, newNodes, n.id);
+                if(div) newLinks.push({source:id,target:div.id,predicate:"impactsDivision"});
+              });
+              break;
+            }
+          }
+        });
+      }
+    } else {
+      // Document / CaseStudy pages: verified against a live read that none of these
+      // (Business Background, Contract Positions, SOPs & Templates, Demo Tour,
+      // Ashfield Mills Case Study, Ask-It-Anything) contain embedded page/database
+      // references — expanding yields zero new nodes, same as the live workspace today.
+    }
+    newNodes.forEach(nn=>{
+      if(nn.x==null){ nn.x=n.x+(Math.random()-0.5)*140; nn.y=n.y+(Math.random()-0.5)*140; nn.vx=0; nn.vy=0; }
+      if(!nodeById[nn.id]){ NODES.push(nn); nodeById[nn.id]=nn; }
+      addOwner(nn.id, n.id);
+    });
+    newLinks.forEach(l=>LINKS.push(l));
+    newNodes.forEach(nn=>{ if(!nn.el) makeNodeEl(nn); });
+    computeGraph();
+    LINKS.forEach(l=>{ if(!l.el) makeLinkEl(l); });
+    refreshSizes();
+    buildFilters();
+    n.expanded=true; n.expandCount=newNodes.length;
+    n._childIds=[...new Set(newNodes.map(nn=>nn.id))];
+    kick(0.78);
+    selectNode(n);
+  }catch(e){
+    if(btn){ btn.textContent="Couldn't expand"; setTimeout(()=>{ btn.disabled=false; btn.textContent=orig; }, 1600); }
+  }
+}
+
+// ---- retract (collapse) a previously-expanded node — removes only the children it uniquely owns,
+// leaves alone any synthetic Organization/CSI-Division node still claimed by another expanded parent ----
+function collapseNode(n, btn){
+  if(!n.expanded) return;
+  const ids = n._childIds || [];
+  const toRemove = [];
+  ids.forEach(id=>{
+    removeOwner(id, n.id);
+    if(ownerCount(id)===0) toRemove.push(id);
+  });
+  const removeSet = new Set(toRemove);
+  if(removeSet.size){
+    toRemove.forEach(id=>{
+      const nn = nodeById[id];
+      if(!nn) return;
+      if(selected===id) clearSelection();
+      if(nn.el) nn.el.remove();
+      delete nodeById[id];
+      delete nodeOwners[id];
+    });
+    NODES = NODES.filter(nn=>!removeSet.has(nn.id));
+    computeGraph();
+  }
+  refreshSizes();
+  buildFilters();
+  n.expanded=false; n.expandCount=null; n._childIds=null;
+  kick(0.5);
+  selectNode(n);
+}
+
+// ---- retract every currently-expanded node in one pass (clean ledger / reset) ----
+function collapseAll(){
+  NODES.filter(nn=>nn.expanded).forEach(nn=>collapseNode(nn));
+  clearSelection();
+}
+
+// ---- force simulation ----
+let alpha=1, simRAF=null;
+function runSim(){
+  alpha=1;
+  cancelAnimationFrame(simRAF);
+  step();
+}
+let lastStepAt=0;
+function kick(a){
+  alpha=Math.max(alpha,a);
+  if(!simRAF){ step(); return; }
+  if(performance.now()-lastStepAt>500){ cancelAnimationFrame(simRAF); simRAF=null; step(); }
+}
+function step(){
+  lastStepAt=performance.now();
+  const k = alpha;
+  const cx=W/2, cy=H/2;
+  for(let i=0;i<NODES.length;i++){
+    const a=NODES[i];
+    for(let j=i+1;j<NODES.length;j++){
+      const b=NODES[j];
+      let dx=a.x-b.x, dy=a.y-b.y;
+      let d2=dx*dx+dy*dy; if(d2<0.01){d2=0.01; dx=(Math.random()-0.5); dy=(Math.random()-0.5);}
+      const d=Math.sqrt(d2);
+      const rep = 5200 / d2;
+      const fx=(dx/d)*rep, fy=(dy/d)*rep;
+      a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
+    }
+  }
+  LINKS.forEach(l=>{
+    const s=nodeById[l.source], t=nodeById[l.target];
+    let dx=t.x-s.x, dy=t.y-s.y;
+    let d=Math.sqrt(dx*dx+dy*dy)||0.01;
+    const cross = s.section!==t.section?40:0;
+    const target = 78 + cross;
+    const f=(d-target)*0.035;
+    const fx=(dx/d)*f, fy=(dy/d)*f;
+    s.vx+=fx; s.vy+=fy; t.vx-=fx; t.vy-=fy;
+  });
+  NODES.forEach(n=>{
+    if(n.fixed){ n.vx=0; n.vy=0; return; }
+    n.vx += (cx-n.x)*0.012;
+    n.vy += (cy-n.y)*0.012;
+    n.vx *= 0.86; n.vy *= 0.86;
+    n.x += n.vx*k; n.y += n.vy*k;
+  });
+  draw();
+  alpha *= 0.985;
+  if(alpha>0.02){ simRAF=requestAnimationFrame(step); }
+  else { simRAF=null; }
+}
+function draw(){
+  LINKS.forEach(l=>{
+    const s=nodeById[l.source], t=nodeById[l.target];
+    l.el.setAttribute("x1",s.x); l.el.setAttribute("y1",s.y);
+    l.el.setAttribute("x2",t.x); l.el.setAttribute("y2",t.y);
+  });
+  NODES.forEach(n=>{ n.el.setAttribute("transform",`translate(${n.x},${n.y})`); });
+}
+
+// ---- family grid layout ----
+// Groups nodes by section ("envelope"). A section's database/hub anchor node becomes
+// a heading cell; its members are laid out in a small grid beneath it; blocks then
+// flow left-to-right, wrapping into rows, centered on the canvas.
+let gridActive = false;
+function computeFamilyGrid(){
+  const families = {};
+  const heading = {};
+  NODES.forEach(n=>{
+    const k = n.section;
+    const isHeading = n.isHub || (n.otype==="Taxonomy" && n.kind==="Database");
+    if(isHeading){ heading[k]=n; return; }
+    if(!families[k]) families[k]=[];
+    families[k].push(n);
+  });
+  Object.values(families).forEach(arr=>arr.sort((a,b)=>a.name.localeCompare(b.name)));
+  const order = Object.keys(SECTIONS).filter(k=>families[k] || heading[k]);
+
+  const CELL = 76, GAP = 64, PER_ROW = 3;
+  const blocks = order.map(k=>{
+    const members = families[k]||[];
+    const cols = Math.max(1, Math.ceil(Math.sqrt(members.length||1)));
+    const rows = Math.ceil((members.length||1)/cols) || 1;
+    return {key:k, members, head:heading[k], cols, rows, w:cols*CELL, h:rows*CELL + (heading[k]?CELL:0)};
+  });
+
+  const targets={};
+  let x=0, y=0, rowH=0, rowCount=0;
+  blocks.forEach(b=>{
+    if(rowCount>=PER_ROW){ x=0; y+=rowH+GAP; rowH=0; rowCount=0; }
+    let topPad=0;
+    if(b.head){ targets[b.head.id]={x:x+b.w/2,y:y+CELL/2}; topPad=CELL; }
+    b.members.forEach((m,idx)=>{
+      const col=idx%b.cols, row=Math.floor(idx/b.cols);
+      targets[m.id]={x:x+col*CELL+CELL/2, y:y+topPad+row*CELL+CELL/2};
+    });
+    x+=b.w+GAP; rowH=Math.max(rowH,b.h); rowCount++;
+  });
+
+  const pts=Object.values(targets);
+  if(pts.length){
+    const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+    const offX=W/2-(Math.min(...xs)+Math.max(...xs))/2;
+    const offY=H/2-(Math.min(...ys)+Math.max(...ys))/2;
+    Object.values(targets).forEach(p=>{ p.x+=offX; p.y+=offY; });
+  }
+  return targets;
+}
+function animateTo(targets, duration){
+  duration = duration || 650;
+  cancelAnimationFrame(simRAF); simRAF=null;
+  const start = performance.now();
+  const from = {};
+  NODES.forEach(n=>{ from[n.id]={x:n.x,y:n.y}; });
+  function frame(now){
+    const t=Math.min(1,(now-start)/duration);
+    const e=1-Math.pow(1-t,3);
+    NODES.forEach(n=>{
+      const tgt=targets[n.id]; if(!tgt) return;
+      const f=from[n.id];
+      n.x=f.x+(tgt.x-f.x)*e; n.y=f.y+(tgt.y-f.y)*e;
+    });
+    draw();
+    if(t<1) requestAnimationFrame(frame);
+    else { NODES.forEach(n=>{ if(targets[n.id]) n.fixed=true; }); }
+  }
+  requestAnimationFrame(frame);
+}
+const gridBtn=document.getElementById("grid-btn");
+function exitGridMode(){
+  gridActive=false;
+  gridBtn.classList.remove("active");
+  gridBtn.textContent="⊞ Family grid";
+  NODES.forEach(n=>{ n.fixed=false; });
+}
+gridBtn.onclick=()=>{
+  if(gridActive){
+    exitGridMode();
+    NODES.forEach(n=>{ if(!n.fixed){ n.vx+=(Math.random()-0.5)*40; n.vy+=(Math.random()-0.5)*40; } });
+    if(simRAF) cancelAnimationFrame(simRAF);
+    simRAF=null; alpha=1; step();
+    return;
+  }
+  gridActive=true;
+  gridBtn.classList.add("active");
+  gridBtn.textContent="⊞ Free layout";
+  animateTo(computeFamilyGrid());
+};
+
+// ---- transforms (pan/zoom) ----
+function applyTransform(){
+  root.setAttribute("transform",`translate(${view.x},${view.y}) scale(${view.k})`);
+}
+
+function initInteractions(){
+  let panning=false, sx=0, sy=0, ox=0, oy=0;
+  svg.addEventListener("mousedown",(e)=>{
+    if(e.target.closest("g.node")) return;
+    panning=true; svg.classList.add("grabbing");
+    sx=e.clientX; sy=e.clientY; ox=view.x; oy=view.y;
+  });
+  window.addEventListener("mousemove",(e)=>{
+    if(!panning) return;
+    view.x=ox+(e.clientX-sx); view.y=oy+(e.clientY-sy); applyTransform();
+  });
+  window.addEventListener("mouseup",()=>{ panning=false; svg.classList.remove("grabbing"); });
+  svg.addEventListener("click",(e)=>{ if(!e.target.closest("g.node")) clearSelection(); });
+  svg.addEventListener("wheel",(e)=>{
+    e.preventDefault();
+    const rect=svg.getBoundingClientRect();
+    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+    const scale = e.deltaY<0 ? 1.12 : 1/1.12;
+    const nk = Math.max(0.25, Math.min(4, view.k*scale));
+    const r = nk/view.k;
+    view.x = mx - (mx-view.x)*r;
+    view.y = my - (my-view.y)*r;
+    view.k = nk; applyTransform();
+  }, {passive:false});
+}
+
+function attachNodeEvents(n){
+  let dragging=false, moved=false, sx=0, sy=0, nx=0, ny=0;
+  n.el.addEventListener("mousedown",(e)=>{
+    e.stopPropagation();
+    dragging=true; moved=false; n.fixed=true;
+    n.el.classList.add("lift");
+    sx=e.clientX; sy=e.clientY; nx=n.x; ny=n.y;
+  });
+  window.addEventListener("mousemove",(e)=>{
+    if(!dragging) return;
+    moved=true;
+    n.x = nx + (e.clientX-sx)/view.k;
+    n.y = ny + (e.clientY-sy)/view.k;
+    kick(0.3); draw();
+  });
+  window.addEventListener("mouseup",()=>{
+    if(dragging){ dragging=false; n.fixed=false; n.el.classList.remove("lift"); kick(0.2); }
+  });
+  n.el.addEventListener("click",(e)=>{
+    e.stopPropagation();
+    if(!moved) selectNode(n);
+  });
+}
+
+// ---- selection / highlight ----
+function selectNode(d){
+  selected=d.id;
+  const nb=adj[d.id];
+  NODES.forEach(n=>{
+    n.el.classList.toggle("dim", n.id!==d.id && !nb.has(n.id));
+    if(n.id===d.id){ n.circle.setAttribute("stroke","#c84f09"); n.circle.setAttribute("stroke-width",2.8); }
+    else restStroke(n);
+  });
+  LINKS.forEach(l=>{
+    const on = (l.source===d.id||l.target===d.id);
+    l.el.classList.toggle("hl", on);
+    if(!on){ l.el.style.strokeOpacity = 0.08; }
+    else { l.el.style.strokeOpacity=""; }
+  });
+  openPanel(d);
+}
+function clearSelection(){
+  selected=null;
+  NODES.forEach(n=>{ n.el.classList.remove("dim"); restStroke(n); });
+  LINKS.forEach(l=>{ l.el.classList.remove("hl"); l.el.style.strokeOpacity=""; });
+  closePanel();
+}
+
+// ---- side panel ----
+const panel=document.getElementById("panel");
+function metaChip(label, value, statusClass){
+  if(value==null || value==="") return "";
+  const cls = statusClass ? " "+statusClass : "";
+  return '<span class="chip'+cls+'">'+label+': '+value+'</span>';
+}
+function openPanel(d){
+  const sec=SECTIONS[d.section]||SECTIONS.business;
+  const tag=document.getElementById("p-tag");
+  tag.textContent=sec.label; tag.style.background=sec.color;
+  document.getElementById("p-otype").textContent = "type: "+(d.otype||"Document");
+  document.getElementById("p-name").textContent=d.name;
+  document.getElementById("p-kind").textContent=d.kind+(d.isHub?" · root":"");
+
+  const meta = d.meta||{};
+  let chips = "";
+  if(meta.Status){
+    const sc = meta.Status.toLowerCase()==="approved"?"status-approved":meta.Status.toLowerCase()==="probation"?"status-probation":meta.Status.toLowerCase()==="avoid"?"status-avoid":"";
+    chips += metaChip("Status", meta.Status, sc);
+  }
+  chips += metaChip("Code", meta.Code);
+  chips += metaChip("Value", meta.Value);
+  chips += metaChip("Earned", meta.Earned);
+  chips += metaChip("Owner", meta.Owner);
+  chips += metaChip("Lead div.", meta.LeadDivision);
+  chips += metaChip("Division", meta.Division);
+  chips += metaChip("Typical", meta.Typical);
+  chips += metaChip("Unit", meta.Unit);
+  chips += metaChip("Stage", meta.Stage);
+  chips += metaChip("Probability", meta.Probability);
+  chips += metaChip("Category", meta.Category);
+  chips += metaChip("Impact", meta.Impact);
+  chips += metaChip("Trade", meta.Trade);
+  chips += metaChip("Type", meta.Type);
+  chips += metaChip("Bondable", meta.Bondable);
+  chips += metaChip("WSIB", meta.WSIB);
+  chips += metaChip("CSI code", meta.code);
+  document.getElementById("p-meta").innerHTML = chips;
+
+  const noteText = meta.Notes || meta.What || meta.Fix || meta.Basis || "";
+  const noteEl = document.getElementById("p-note");
+  if(noteText){
+    let html = "";
+    if(meta.What){ html += "<b>What happened:</b> "+meta.What+"<br><br>"; }
+    if(meta.Fix){ html += "<b>What we do differently:</b> "+meta.Fix; }
+    if(!meta.What && !meta.Fix){ html = noteText; }
+    noteEl.innerHTML = html;
+    noteEl.style.display = "block";
+  } else { noteEl.style.display="none"; }
+
+  const open=document.getElementById("p-open");
+  if(d.url){ open.href=d.url; open.style.display="inline-block"; }
+  else open.style.display="none";
+
+  const exp=document.getElementById("p-expand");
+  if(d.kind==="Database" || d.kind==="Page"){
+    exp.style.display="inline-block";
+    exp.disabled=false;
+    exp.onclick=(e)=>{ e.stopPropagation(); expandNode(d, exp); };
+    if(d.expanded){
+      exp.textContent = "⤡ Collapse"+(d.expandCount!=null?" ("+d.expandCount+")":"");
+    } else {
+      exp.textContent = d.kind==="Database" ? "⤢ Expand records" : "⤢ Expand children";
+    }
+  } else {
+    exp.style.display="none";
+  }
+
+  const conns=[...adj[d.id]].map(id=>nodeById[id]).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
+  const cont=document.getElementById("p-conns"); cont.innerHTML="";
+  document.getElementById("p-conn-title").textContent=`relates_to (${conns.length})`;
+  conns.forEach(c=>{
+    const l = LINKS.find(l=> (l.source===d.id&&l.target===c.id) || (l.target===d.id&&l.source===c.id) );
+    const pred = l ? (PREDICATES[l.predicate]||{label:l.predicate}).label : "references";
+    const dir = l && l.source===d.id ? "→" : "←";
+    const row=document.createElement("div"); row.className="conn";
+    const dot=document.createElement("span"); dot.className="dot";
+    dot.style.background=(SECTIONS[c.section]||SECTIONS.business).color;
+    row.appendChild(dot);
+    const dirSpan=document.createElement("span"); dirSpan.className="dir"; dirSpan.textContent=dir;
+    row.appendChild(dirSpan);
+    const predSpan=document.createElement("span"); predSpan.className="pred"; predSpan.textContent=pred;
+    row.appendChild(predSpan);
+    row.appendChild(document.createTextNode(c.name));
+    row.onclick=ev=>{ev.stopPropagation(); selectNode(nodeById[c.id]);};
+    cont.appendChild(row);
+  });
+  panel.classList.add("open");
+}
+function closePanel(){ panel.classList.remove("open"); }
+document.getElementById("panel-close").onclick=e=>{e.stopPropagation();clearSelection();};
+
+// ---- about modal ----
+const aboutOverlay=document.getElementById("about-overlay");
+document.getElementById("about-btn").onclick=()=>{ aboutOverlay.classList.remove("hidden"); };
+document.getElementById("about-close").onclick=()=>{ aboutOverlay.classList.add("hidden"); };
+aboutOverlay.addEventListener("click",(e)=>{ if(e.target===aboutOverlay) aboutOverlay.classList.add("hidden"); });
+
+// ---- filters + search ----
+const hiddenSections=new Set();
+function buildFilters(){
+  const filtersDiv=document.getElementById("filters"); filtersDiv.innerHTML="";
+  const counts={}; NODES.forEach(n=>counts[n.section]=(counts[n.section]||0)+1);
+  Object.entries(SECTIONS).forEach(([key,s])=>{
+    if(!counts[key]) return;
+    const btn=document.createElement("button"); btn.className="filter-btn";
+    if(hiddenSections.has(key)) btn.classList.add("off");
+    const sw=document.createElement("span"); sw.className="swatch"; sw.style.background=s.color;
+    const cnt=document.createElement("span"); cnt.className="count"; cnt.textContent=counts[key];
+    btn.appendChild(sw); btn.appendChild(document.createTextNode(s.label)); btn.appendChild(cnt);
+    btn.onclick=()=>{
+      if(hiddenSections.has(key)){hiddenSections.delete(key);btn.classList.remove("off");}
+      else{hiddenSections.add(key);btn.classList.add("off");}
+      applyVisibility();
+    };
+    filtersDiv.appendChild(btn);
+  });
+}
+function buildPredicateLegend(){
+  const wrap = document.getElementById("pred-rows"); wrap.innerHTML="";
+  Object.entries(GROUPS).forEach(([key,g])=>{
+    const row=document.createElement("div"); row.className="pred-row";
+
+    const line=document.createElement("div"); line.className="pred-line";
+    const s = document.createElementNS(SVGNS,"svg");
+    s.setAttribute("width","34"); s.setAttribute("height","10");
+    const ln = document.createElementNS(SVGNS,"line");
+    ln.setAttribute("x1","1"); ln.setAttribute("y1","5"); ln.setAttribute("x2","33"); ln.setAttribute("y2","5");
+    ln.setAttribute("stroke", g.color); ln.setAttribute("stroke-width", g.width);
+    ln.setAttribute("stroke-dasharray", g.dash);
+    s.appendChild(ln);
+    line.appendChild(s);
+    const title = document.createElement("span"); title.className="ptitle"; title.textContent=g.title;
+    line.appendChild(title);
+    row.appendChild(line);
+
+    const ex = document.createElement("div"); ex.className="pex"; ex.textContent=g.example;
+    row.appendChild(ex);
+
+    wrap.appendChild(row);
+  });
+}
+const searchInput=document.getElementById("search");
+const searchStatus=document.getElementById("search-status");
+let semanticMatchIds=new Set();
+let semanticForQuery=null;
+let semanticDebounce=null;
+
+searchInput.addEventListener("input",()=>{
+  semanticMatchIds=new Set();
+  semanticForQuery=null;
+  searchStatus.textContent="";
+  searchStatus.classList.remove("err");
+  applyVisibility();
+  clearTimeout(semanticDebounce);
+  const q=searchInput.value.trim();
+  if(q.length<2) return;
+  const keywordHits=NODES.filter(n=>!hiddenSections.has(n.section) && nodeSearchText(n).includes(q.toLowerCase())).length;
+  if(keywordHits>0) return;
+  semanticDebounce=setTimeout(()=>runSemanticSearch(q), 600);
+});
+
+async function runSemanticSearch(q){
+  if(searchInput.value.trim()!==q) return;
+  searchStatus.textContent="🔮 checking semantic search…";
+  searchStatus.classList.remove("err");
+  const candidates=NODES
+    .filter(n=>!hiddenSections.has(n.section))
+    .map(n=>({id:n.id, name:n.name, meta:nodeSearchText(n)}));
+  try{
+    const resp=await fetch("/.netlify/functions/semantic-search",{
+      method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({query:q, candidates})
+    });
+    const data=await resp.json();
+    if(searchInput.value.trim()!==q) return;
+    if(!resp.ok){
+      searchStatus.textContent=data.error||"Semantic search unavailable right now.";
+      searchStatus.classList.add("err");
+      return;
+    }
+    semanticMatchIds=new Set(data.ids||[]);
+    semanticForQuery=q;
+    if(semanticMatchIds.size){
+      searchStatus.textContent="🔮 semantic match: "+semanticMatchIds.size+" result"+(semanticMatchIds.size===1?"":"s");
+    } else {
+      searchStatus.textContent="No keyword or semantic matches.";
+    }
+    applyVisibility();
+  }catch(e){
+    if(searchInput.value.trim()!==q) return;
+    searchStatus.textContent="Semantic search unavailable right now.";
+    searchStatus.classList.add("err");
+  }
+}
+
+function nodeSearchText(d){
+  if(d._searchText) return d._searchText;
+  const parts=[d.name, d.kind, d.otype, d.section];
+  if(d.meta){ for(const k in d.meta){ if(d.meta[k]!=null && d.meta[k]!=="") parts.push(String(d.meta[k])); } }
+  d._searchText = parts.join(" • ").toLowerCase();
+  return d._searchText;
+}
+function isHidden(d){
+  if(hiddenSections.has(d.section)) return true;
+  const q=searchInput.value.trim().toLowerCase();
+  if(!q) return false;
+  if(nodeSearchText(d).includes(q)) return false;
+  if(semanticForQuery===searchInput.value.trim() && semanticMatchIds.has(d.id)) return false;
+  return true;
+}
+function applyVisibility(){
+  NODES.forEach(n=>n.el.classList.toggle("hidden",isHidden(n)));
+  LINKS.forEach(l=>l.el.classList.toggle("hidden",isHidden(nodeById[l.source])||isHidden(nodeById[l.target])));
+}
+document.getElementById("reset-btn").onclick=()=>{
+  if(gridActive) exitGridMode();
+  collapseAll();
+  hiddenSections.clear();
+  document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("off"));
+  searchInput.value=""; applyVisibility(); clearSelection();
+  view={x:0,y:0,k:1}; applyTransform();
+  // nudge remaining nodes so the resettle is visible, and force-restart the sim
+  // regardless of whatever state simRAF was left in (guards against a stuck loop)
+  NODES.forEach(n=>{ if(!n.fixed){ n.vx += (Math.random()-0.5)*50; n.vy += (Math.random()-0.5)*50; } });
+  if(simRAF){ cancelAnimationFrame(simRAF); }
+  simRAF=null; alpha=1;
+  step();
+};
+
+window.addEventListener("resize",()=>{
+  W=window.innerWidth; H=window.innerHeight;
+  if(svg) svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  kick(0.3);
+});
+
+// ================= BOOT =================
+function showError(title, detail){
+  document.getElementById("overlay").innerHTML =
+    '<div id="ov-msg"><span class="big">'+title+'</span>'+detail+'</div>';
+}
+(async function boot(){
+  try{
+    const data = await loadData();
+    if(!data.nodes.length) throw new Error("EMPTY");
+    document.getElementById("overlay").classList.add("gone");
+    document.getElementById("controls").classList.remove("hidden");
+    document.getElementById("hint").classList.remove("hidden");
+    document.getElementById("synced").textContent =
+      "● static snapshot · synced "+SNAPSHOT_DATE+" · "+data.nodes.length+" nodes · "+data.links.length+" links · expand any database node for full records";
+    buildGraph(data);
+  }catch(err){
+    showError("Couldn't load the demo","Something went wrong building the graph ("+((err&&err.message)||"unknown")+"). Try reloading the page.");
+  }
+})();
+</script>
+</body>
+</html>
