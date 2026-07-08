@@ -1249,6 +1249,8 @@ searchInput.addEventListener("input",()=>{
   clearTimeout(semanticDebounce);
   const q=searchInput.value.trim();
   if(q.length<2) return;
+  autoExpandMatchingDatabases(q.toLowerCase());
+  applyVisibility();
   const keywordHits=NODES.filter(n=>!hiddenSections.has(n.section) && nodeSearchText(n).includes(q.toLowerCase())).length;
   if(keywordHits>0) return;
   semanticDebounce=setTimeout(()=>runSemanticSearch(q), 600);
@@ -1295,6 +1297,20 @@ function nodeSearchText(d){
   if(d.meta){ for(const k in d.meta){ if(d.meta[k]!=null && d.meta[k]!=="") parts.push(String(d.meta[k])); } }
   d._searchText = parts.join(" • ").toLowerCase();
   return d._searchText;
+}
+function rowSearchText(row){
+  return Object.keys(row).filter(k=>k!=="url").map(k=>row[k]).filter(v=>v!=null && v!=="").join(" \u2022 ").toLowerCase();
+}
+// A collapsed database's row-level content (steel rates, structural steel subs, etc.) isn't
+// in NODES yet, so keyword/semantic search can't see it. If the query matches something inside
+// a still-collapsed database, auto-expand that database so the real matching record surfaces.
+function autoExpandMatchingDatabases(q){
+  if(!q) return;
+  NODES.filter(n=>n.kind==="Database" && !n.expanded).forEach(n=>{
+    const kind2=detectDbKind(n.name);
+    const rows=STATIC_ROWS[kind2]||[];
+    if(rows.some(row=>rowSearchText(row).includes(q))) expandNode(n);
+  });
 }
 function isHidden(d){
   if(hiddenSections.has(d.section)) return true;
